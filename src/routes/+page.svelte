@@ -1,7 +1,13 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { getVersion } from "@tauri-apps/api/app";
   import { check } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+
+  getVersion().then((v) => {
+    getCurrentWindow().setTitle(`request-crab v${v}`);
+  });
 
   let url = $state("https://httpbin.org/get");
   let method = $state("GET");
