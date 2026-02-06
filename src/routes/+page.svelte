@@ -1,10 +1,32 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { check } from "@tauri-apps/plugin-updater";
+  import { relaunch } from "@tauri-apps/plugin-process";
 
   let url = $state("https://httpbin.org/get");
   let method = $state("GET");
   let response = $state("");
   let loading = $state(false);
+
+  let update: Awaited<ReturnType<typeof check>> = $state(null);
+  let updating = $state(false);
+
+  async function checkForUpdate() {
+    try {
+      update = await check();
+    } catch (e) {
+      console.error("Update check failed:", e);
+    }
+  }
+
+  async function installUpdate() {
+    if (!update) return;
+    updating = true;
+    await update.downloadAndInstall();
+    await relaunch();
+  }
+
+  checkForUpdate();
 
   async function sendRequest() {
     loading = true;
@@ -28,6 +50,12 @@
 
 <main>
   <h1>Request Crab</h1>
+
+  {#if update}
+    <button class="update-btn" onclick={installUpdate} disabled={updating}>
+      {updating ? "Updating..." : `Update ${update.version} verfügbar`}
+    </button>
+  {/if}
 
   <div class="request-bar">
     <select bind:value={method}>
