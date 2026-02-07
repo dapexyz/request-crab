@@ -1,5 +1,6 @@
 use reqwest::RequestBuilder;
 use std::time::Instant;
+mod migrations;
 mod models;
 use models::{HttpResponse, RequestPayload};
 
@@ -61,6 +62,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:requests.db", migrations::migrations())
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![request])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

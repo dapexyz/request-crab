@@ -4,6 +4,7 @@
   import { check } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { loadRequests, saveRequest, deleteRequest, type SavedRequest } from "$lib/db";
 
   getVersion().then((v) => {
     getCurrentWindow().setTitle(`request-crab v${v}`);
@@ -11,8 +12,11 @@
 
   let url = $state("https://httpbin.org/get");
   let method = $state("GET");
+  let requestName = $state("");
+  let currentRequestId = $state<string | null>(null);
   let response = $state("");
   let loading = $state(false);
+  let savedRequests = $state<SavedRequest[]>([]);
 
   let update: Awaited<ReturnType<typeof check>> = $state(null);
   let updating = $state(false);
@@ -33,6 +37,11 @@
   }
 
   checkForUpdate();
+  refreshSavedRequests();
+
+  async function refreshSavedRequests() {
+    savedRequests = await loadRequests();
+  }
 
   async function sendRequest() {
     loading = true;
@@ -52,6 +61,43 @@
     }
     loading = false;
   }
+
+  async function handleSave() {
+    const name = requestName.trim() || url;
+    const id = currentRequestId || crypto.randomUUID();
+    await saveRequest({ id, name, method, url, headers: "[]", body: null });
+    currentRequestId = id;
+    requestName = name;
+    await refreshSavedRequests();
+  }
+
+  function selectRequest(req: SavedRequest) {
+    currentRequestId = req.id;
+    requestName = req.name;
+    method = req.method;
+    url = req.url;
+    response = "";
+  }
+
+  async function handleDelete(id: string) {
+    await deleteRequest(id);
+    if (currentRequestId === id) {
+      currentRequestId = null;
+      requestName = "";
+      method = "GET";
+      url = "https://httpbin.org/get";
+      response = "";
+    }
+    await refreshSavedRequests();
+  }
+
+  function newRequest() {
+    currentRequestId = null;
+    requestName = "";
+    method = "GET";
+    url = "";
+    response = "";
+  }
 </script>
 
 <main>
@@ -62,6 +108,19 @@
       {updating ? "Updating..." : `Update ${update.version} verfügbar`}
     </button>
   {/if}
+
+  <fieldset>
+    <legend>Saved Requests</legend>
+    <button onclick={newRequest}>New</button>
+    <ul>
+      {#each savedRequests as req}
+        <li>
+          <button onclick={() => selectRequest(req)}>{req.method} {req.name}</button>
+          <button onclick={() => handleDelete(req.id)}>x</button>
+        </li>
+      {/each}
+    </ul>
+  </fieldset>
 
   <div class="request-bar">
     <select bind:value={method}>
@@ -79,7 +138,10 @@
     <button onclick={sendRequest} disabled={loading}>
       {loading ? "Loading..." : "Send"}
     </button>
+    <button onclick={handleSave}>Save</button>
   </div>
+
+  <input bind:value={requestName} placeholder="Request name" />
 
   <pre class="response">{response}</pre>
 </main>
